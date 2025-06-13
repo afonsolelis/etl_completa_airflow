@@ -1,0 +1,91 @@
+name: ETL Pipeline Diário
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Executa diariamente às 2:00 AM UTC
+  workflow_dispatch:  # Permite execução manual
+
+env:
+  DOCKER_COMPOSE_FILE: docker-compose.yml
+
+jobs:
+  etl-pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Criar diretórios necessários
+      run: |
+        mkdir -p data/raw data/processed data/warehouse
+        mkdir -p airflow/logs
+        sudo chmod 777 airflow/logs data
+    
+    - name: Iniciar serviços necessários
+      run: |
+        docker-compose up -d postgres-data redis
+        sleep 30
+        
+    - name: Verificar saúde dos serviços
+      run: |
+        docker-compose ps
+        docker-compose exec -T postgres-data pg_isready -U dataops
+        
+    - name: Inicializar Airflow
+      run: |
+        docker-compose up -d airflow-init
+        docker-compose wait airflow-init
+        
+    - name: Iniciar Airflow
+      run: |
+        docker-compose up -d airflow-webserver airflow-scheduler
+        sleep 60
+        
+    - name: Verificar status do Airflow
+      run: |
+        docker-compose exec -T airflow-webserver airflow dags list
+        
+    - name: Executar pipeline ETL
+      run: |
+        docker-compose exec -T airflow-webserver airflow dags trigger etl_pipeline
+        
+    - name: Aguardar conclusão do pipeline
+      run: |
+        sleep 300  # Aguarda 5 minutos para o pipeline completar
+        docker-compose exec -T airflow-webserver airflow dags state etl_pipeline $(date +%Y-%m-%d)
+        
+    - name: Verificar logs do pipeline
+      run: |
+        docker-compose logs airflow-scheduler
+        
+    - name: Backup dos dados processados
+      if: success()
+      run: |
+        mkdir -p backup/$(date +%Y%m%d_%H%M%S)
+        docker-compose exec -T postgres-data pg_dump -U dataops datawarehouse > backup/$(date +%Y%m%d_%H%M%S)/database_backup.sql
+        cp -r data backup/$(date +%Y%m%d_%H%M%S)/
+        
+    - name: Upload artifacts em caso de falha
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: etl-failure-logs-${{ github.run_number }}
+        path: |
+          airflow/logs/
+          backup/
+        retention-days: 7
+        
+    - name: Notificação de sucesso
+      if: success()
+      run: |
+        echo "Pipeline ETL executado com sucesso em $(date)"
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose down
+        docker system prune -f

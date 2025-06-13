@@ -1,0 +1,36 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  - name: PostgreSQL-Data
+    type: postgres
+    access: proxy
+    url: postgres-data:5432
+    database: datawarehouse
+    user: dataops
+    secureJsonData:
+      password: dataops123
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+    editable: true
+
+  - name: PostgreSQL-Airflow
+    type: postgres
+    access: proxy
+    url: postgres-airflow:5432
+    database: airflow
+    user: airflow
+    secureJsonData:
+      password: airflow
+    jsonData:
+      sslmode: disable
+    editable: true

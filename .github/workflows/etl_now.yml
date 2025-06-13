@@ -1,0 +1,70 @@
+name: etl_now
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  etl-pipeline:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dataops
+          POSTGRES_PASSWORD: dataops123
+          POSTGRES_DB: datawarehouse
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas sqlalchemy psycopg2-binary requests
+
+      - name: Create data directories
+        run: |
+          mkdir -p data/raw data/processed data/warehouse
+
+      - name: Initialize database
+        run: |
+          PGPASSWORD=dataops123 psql -h localhost -U dataops -d datawarehouse -f sql/create_tables.sql
+          PGPASSWORD=dataops123 psql -h localhost -U dataops -d datawarehouse -f sql/sample_data.sql
+
+      - name: Run ETL Extract
+        run: |
+          cd etl/extract
+          python api_extractor.py
+          python db_extractor.py
+
+      - name: Run ETL Transform
+        run: |
+          cd etl/transform
+          python data_transformer.py
+
+      - name: Run ETL Load
+        run: |
+          cd etl/load
+          python data_loader.py
+
+      - name: Verify ETL completion
+        run: |
+          echo "ETL pipeline completed successfully"
+          ls -la data/
