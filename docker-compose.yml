@@ -9,7 +9,7 @@ x-airflow-common:
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres-airflow/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__FERNET_KEY: 'gAAAAABhFMr3VKUOhO3vv6GZIGfkEKHl7h8Y8P4cMsJKT7J8H9wKb8H8H8H8H8H8H8H8H8H8H8H8H='
+    AIRFLOW__CORE__FERNET_KEY: 'oZBfUErkuEPJd3Pl-Du1ekmvVbndqB0fPT35ezvXGyc='
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
